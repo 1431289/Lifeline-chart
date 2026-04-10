@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Lifeline Chart - AI Analysis Edition</title>
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --card-bg: rgba(22, 22, 22, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-color: #f8f9fa;
+            --accent-color: #007bff;
+            --vibrant-blue: #00d2ff;
+            --vibrant-red: #ff4b2b;
+            --vibrant-green: #38ef7d;
+            --gradient-blue: linear-gradient(135deg, #00d2ff, #3a7bd5);
+            --gradient-ai: linear-gradient(135deg, #8e2de2, #4a00e0);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .glass {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .glow-text {
+            background: linear-gradient(to right, #00d2ff, #73ff95);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
+        }
+
+        .entry-form.edit-mode-active {
+            border: 2px solid #f5576c;
+            box-shadow: 0 0 20px rgba(245, 87, 108, 0.4);
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.005); }
+            100% { transform: scale(1); }
+        }
+
+        .number-input::-webkit-outer-spin-button,
+        .number-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .number-input[type=number] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        .btn-primary {
+            background: var(--gradient-blue);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-ai {
+            background: var(--gradient-ai);
+            transition: all 0.3s;
+        }
+
+        .btn-ai:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(142, 45, 226, 0.5);
+        }
+
+        .btn-ai:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .annotation-bubble {
+            position: absolute;
+            background: rgba(22, 22, 22, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 4px 8px;
+            color: white;
+            min-width: 80px;
+            min-height: 45px;
+            pointer-events: auto;
+            cursor: move;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            container-type: size;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        .annotation-bubble::after {
+            content: attr(data-feeling);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 100;
+            margin-bottom: 8px;
+            visibility: hidden;
+            min-width: max-content;
+            max-width: 200px;
+            text-align: left;
+        }
+
+        .annotation-bubble:hover::after {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -4px);
+        }
+
+        .academic-year-text {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.6);
+            min-height: 1.2rem;
+            font-weight: 600;
+        }
+
+        .career-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .career-row.dragging { opacity: 0.5; background: rgba(255, 255, 255, 0.2); }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        #ai-loading {
+            display: none;
+        }
+
+        .ai-pulse {
+            animation: ai-pulse 2s infinite;
+        }
+
+        @keyframes ai-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(142, 45, 226, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(142, 45, 226, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(142, 45, 226, 0); }
+        }
+
+        /* Markdown Styles for Report */
+        .prose h1, .prose h2, .prose h3 { color: var(--vibrant-blue); font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+        .prose p { margin-bottom: 1em; }
+        .prose strong { color: var(--vibrant-green); }
+
+        /* Premium Enhancements */
+        .premium-border {
+            position: relative;
+            background: rgba(22, 22, 22, 0.7);
+            border-radius: 1rem;
+            z-index: 1;
+        }
+        .premium-border::before {
+            content: "";
+            position: absolute;
+            inset: -1px;
+            background: linear-gradient(135deg, rgba(0, 210, 255, 0.4), rgba(142, 45, 226, 0.4), rgba(56, 239, 125, 0.4));
+            border-radius: 1.1rem;
+            z-index: -1;
+            padding: 1px;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            -webkit-mask-composite: xor;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 15px 25px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            z-index: 9999;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast-icon { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--gradient-blue); }
+
+        .modal-content {
+            animation: modal-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes modal-enter {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        #ai-result-panel {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(142, 45, 226, 0.3);
+            box-shadow: inset 0 0 20px rgba(142, 45, 226, 0.1);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="app-container max-w-5xl mx-auto space-y-8">
+        <header class="text-center">
+            <h1 class="glow-text text-5xl font-bold mb-2">My Lifeline Chart</h1>
+            <p class="text-lg opacity-70">人生の起伏を美しく、AIと共に振り返る。</p>
+        </header>
+
+        <main class="space-y-8">
+            <!-- Entry Form -->
+            <section class="card glass rounded-2xl p-6 md:p-8 entry-form">
+                <div class="edit-indicator hidden text-center text-red-400 font-bold mb-4">※ 現在データを編集モードです</div>
+                <form id="lifeline-form" class="flex flex-wrap gap-x-5 gap-y-8 items-end">
+                    <div class="flex-1 min-w-[200px] relative">
+                        <label class="block text-sm font-semibold mb-2">年齢</label>
+                        <input type="number" id="age" min="0" max="150" class="w-full p-3 rounded-lg bg-white/5 border border-white/20 focus:outline-none focus:border-blue-400" required>
+                        <div class="absolute top-full left-0 right-0 flex justify-between mt-1 pointer-events-none">
+                            <div id="academic-year-display" class="academic-year-text pointer-events-auto"></div>
+                            <button type="button" id="open-settings-btn" class="text-xs text-blue-400 opacity-80 hover:opacity-100 hover:underline pointer-events-auto">⚙️ 経歴設定</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-sm font-semibold mb-2">出来事</label>
+                        <input type="text" id="event" class="w-full p-3 rounded-lg bg-white/5 border border-white/20 focus:outline-none focus:border-blue-400" required>
+                    </div>
+                    <div class="flex-1 min-w-[250px]">
+                        <label class="block text-sm font-semibold mb-2">感情指数 (-100 〜 +100)</label>
+                        <div class="flex items-center gap-4">
+                            <input type="range" id="emotion" min="-100" max="100" value="0" class="flex-1 cursor-pointer">
+                            <input type="number" id="emotion-number" min="-100" max="100" value="0" class="number-input w-16 p-2 rounded-md bg-white/5 border border-white/20 text-blue-400 font-bold text-center">
+                        </div>
+                    </div>
+                    <div class="w-full">
+                        <label class="block text-sm font-semibold mb-2">気持ち</label>
+                        <textarea id="feeling" rows="2" class="w-full p-3 rounded-lg bg-white/5 border border-white/20 focus:outline-none focus:border-blue-400 resize-none" placeholder="その時の感情や考えを自由に記入..."></textarea>
+                    </div>
+                    <div class="w-full flex justify-center gap-4 mt-2">
+                        <button type="submit" id="add-btn" class="btn-primary rounded-lg py-3 px-8 font-bold text-white shadow-lg">データを登録する</button>
+                        <button type="button" id="cancel-edit-btn" class="hidden bg-white/10 hover:bg-white/20 rounded-lg py-3 px-8 border border-white/20">キャンセル</button>
+                    </div>
+                    <input type="hidden" id="edit-index" value="-1">
+                </form>
+            </section>
+
+            <!-- AI Analysis & Chart Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Chart Area -->
+                <div class="lg:col-span-2 space-y-4">
+                    <section id="chart-capture-area" class="card glass premium-border rounded-2xl p-6 h-[450px] relative">
+                        <canvas id="lifelineChart"></canvas>
+                        <div id="annotations-layer" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+                    </section>
+                    <div class="flex flex-wrap justify-center gap-4">
+                        <button id="open-list-btn" class="bg-white/10 hover:bg-white/20 rounded-lg py-2 px-6 border border-white/20 transition-all">データリストを表示</button>
+                        <button id="copy-image-btn" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 rounded-lg py-2 px-6 border border-blue-500/30 transition-all flex items-center gap-2">
+                            <span>🖼️ 画像をコピー</span>
+                        </button>
+                        <button id="clear-btn" class="text-red-400 border border-red-400 hover:bg-red-400/10 rounded-lg py-2 px-6 transition-all">全データをクリア</button>
+                    </div>
+                </div>
+
+                <!-- AI Analysis Area -->
+                <section class="card glass rounded-2xl p-6 flex flex-col">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <span class="text-2xl">✨</span> AI 自己分析
+                    </h2>
+                    <div class="space-y-4 flex-1 flex flex-col">
+                        <div>
+                            <label class="block text-xs opacity-60 mb-1">Gemini API Key</label>
+                            <input type="password" id="api-key" class="w-full p-2 rounded bg-white/10 border border-white/20 focus:outline-none focus:border-purple-400" placeholder="AIキーを入力してください...">
+                            <p class="text-[10px] opacity-40 mt-1">※ リロードや画面を閉じるとキーは消去されます。<br>※ モデル名は gemini-flash-latest にしてください。</p>
+                        </div>
+                        <button id="analyze-btn" class="btn-ai w-full py-3 rounded-xl font-bold text-white shadow-xl">分析を開始する</button>
+                        
+                        <!-- Analysis Result -->
+                        <div id="ai-loading" class="flex-1 flex flex-col items-center justify-center space-y-2">
+                             <div class="w-12 h-12 rounded-full ai-pulse flex items-center justify-center bg-purple-600">
+                                 <svg class="animate-spin h-6 w-6 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                             </div>
+                             <p class="text-sm italic opacity-70">鋭い洞察力で分析中...</p>
+                        </div>
+                        <div id="ai-result-panel" class="hidden flex-1 overflow-y-auto p-4 rounded-xl text-sm prose">
+                            <!-- AI Result will appear here -->
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="text-center py-8 opacity-30 text-xs">
+            <p>&copy; 2026 My Lifeline Chart by Antigravity - Senior Implementation</p>
+        </footer>
+    </div>
+
+    <!-- Modal for Data List -->
+    <div id="list-modal" class="modal">
+        <div class="modal-content glass premium-border mx-auto mt-[5vh] p-6 max-w-3xl rounded-2xl shadow-2xl">
+            <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <h2 class="text-2xl font-bold glow-text">登録データ一覧</h2>
+                <div class="flex items-center gap-4">
+                    <button id="copy-all-btn" class="bg-white/10 hover:bg-white/20 rounded-lg py-2 px-4 text-sm border border-white/20 transition-all">全てコピー</button>
+                    <span class="close-btn text-3xl cursor-pointer opacity-50 hover:opacity-100 transition-all">&times;</span>
+                </div>
+            </div>
+            <div class="max-h-[60vh] overflow-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="opacity-50 text-xs">
+                            <th class="p-3">年齢</th>
+                            <th class="p-3">出来事</th>
+                            <th class="p-3">感情</th>
+                            <th class="p-3">気持ち</th>
+                            <th class="p-3">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-list-body" class="text-sm"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Career Settings -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content glass premium-border mx-auto mt-[5vh] p-6 max-w-xl rounded-2xl shadow-2xl">
+            <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <h2 class="text-2xl font-bold glow-text">経歴設定</h2>
+                <span id="close-settings-btn" class="text-3xl cursor-pointer opacity-50 hover:opacity-100 transition-all">&times;</span>
+            </div>
+            <div class="space-y-4">
+                <p class="text-xs opacity-70 italic">各行をドラッグして順番を入れ替え、経歴の期間を設定してください。</p>
+                <div id="career-timeline-container"></div>
+                <button type="button" id="add-career-btn" class="w-full border border-dashed border-white/30 rounded-lg py-2 text-sm hover:bg-white/5">+ 期間を追加</button>
+                <div class="pt-6 border-t border-white/10 text-center">
+                    <button id="save-settings-btn" class="btn-primary rounded-lg py-2 px-10 font-bold">保存して閉じる</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Memory-only API Key
+            let geminiApiKey = "";
+
+            // State management
+            let lifeEvents = JSON.parse(localStorage.getItem('lifeEvents')) || [];
+            let careers = JSON.parse(localStorage.getItem('userCareers')) || [
+                {start: 0, end: 5, name: '未就学児'},
+                {start: 6, end: 11, name: '小学校'},
+                {start: 12, end: 14, name: '中学校'},
+                {start: 15, end: 17, name: '高校'},
+                {start: 18, end: 21, name: '大学'},
+                {start: 22, end: 150, name: '社会人'}
+            ];
+            let chart = null;
+
+            // DOM Elements
+            const form = document.getElementById('lifeline-form');
+            const ageInput = document.getElementById('age');
+            const eventInput = document.getElementById('event');
+            const emotionInput = document.getElementById('emotion');
+            const emotionNumber = document.getElementById('emotion-number');
+            const feelingInput = document.getElementById('feeling');
+            const editIndexInput = document.getElementById('edit-index');
+            const addBtn = document.getElementById('add-btn');
+            const cancelEditBtn = document.getElementById('cancel-edit-btn');
+            const openListBtn = document.getElementById('open-list-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const listModal = document.getElementById('list-modal');
+            const closeListBtn = document.querySelector('.close-btn');
+            const dataListBody = document.getElementById('data-list-body');
+            const copyAllBtn = document.getElementById('copy-all-btn');
+            const academicYearDisplay = document.getElementById('academic-year-display');
+            const openSettingsBtn = document.getElementById('open-settings-btn');
+            const settingsModal = document.getElementById('settings-modal');
+            const closeSettingsBtn = document.getElementById('close-settings-btn');
+            const careerTimelineContainer = document.getElementById('career-timeline-container');
+            const addCareerBtn = document.getElementById('add-career-btn');
+            const saveSettingsBtn = document.getElementById('save-settings-btn');
+            const apiKeyInput = document.getElementById('api-key');
+            const analyzeBtn = document.getElementById('analyze-btn');
+            const aiLoading = document.getElementById('ai-loading');
+            const aiResultPanel = document.getElementById('ai-result-panel');
+            const copyImageBtn = document.getElementById('copy-image-btn');
+
+            // --- Toast Notification System ---
+            function showToast(message, type = 'success') {
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                const icon = type === 'success' ? '✓' : 'ℹ';
+                toast.innerHTML = `<div class="toast-icon">${icon}</div><span>${message}</span>`;
+                document.body.appendChild(toast);
+                
+                // Trigger reflow for animation
+                setTimeout(() => toast.classList.add('show'), 10);
+                
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => toast.remove(), 500);
+                }, 3000);
+            }
+
+            // --- Capture Chart as Image ---
+            async function copyChartToClipboard() {
+                const target = document.getElementById('chart-capture-area');
+                copyImageBtn.disabled = true;
+                const originalText = copyImageBtn.innerHTML;
+                copyImageBtn.innerHTML = '<span>⌛ 準備中...</span>';
+
+                try {
+                    // Ensure the canvas is ready and annotations are rendered
+                    const canvas = await html2canvas(target, {
+                        backgroundColor: '#0d0d0d', // Explicitly set background
+                        scale: 2, // Higher quality
+                        useCORS: true,
+                        logging: false,
+                        onclone: (clonedDoc) => {
+                            // Ensure the chart canvas inside clone is also correct
+                            // and labels are visible
+                        }
+                    });
+
+                    canvas.toBlob(async (blob) => {
+                        try {
+                            const item = new ClipboardItem({ "image/png": blob });
+                            await navigator.clipboard.write([item]);
+                            showToast('グラフをクリップボードにコピーしたよ！');
+                        } catch (err) {
+                            console.error('Clipboard error:', err);
+                            showToast('クリップボードへの保存に失敗したみたい...', 'error');
+                        }
+                    }, 'image/png');
+
+                } catch (error) {
+                    console.error('Capture error:', error);
+                    showToast('画像の作成に失敗しちゃった。', 'error');
+                } finally {
+                    copyImageBtn.disabled = false;
+                    copyImageBtn.innerHTML = originalText;
+                }
+            }
+
+            copyImageBtn.addEventListener('click', copyChartToClipboard);
+
+            // Chart Initialization
+            function initChart() {
+                const ctx = document.getElementById('lifelineChart').getContext('2d');
+                const sortedData = [...lifeEvents].sort((a, b) => a.age - b.age);
+                
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: sortedData.map(d => d.age + '歳'),
+                        datasets: [{
+                            label: '感情指数',
+                            data: sortedData.map(d => d.emotion),
+                            borderColor: '#00d2ff',
+                            backgroundColor: 'rgba(0, 210, 255, 0.1)',
+                            borderWidth: 3,
+                            pointBackgroundColor: '#00d2ff',
+                            pointRadius: 6,
+                            pointHoverRadius: 10,
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        onClick: (e, elements) => {
+                            if (elements.length > 0) {
+                                const index = elements[0].index;
+                                const sorted = [...lifeEvents].sort((a,b) => a.age - b.age);
+                                const original = lifeEvents.findIndex(d => d.age === sorted[index].age && d.event === sorted[index].event);
+                                if (original !== -1) editData(original);
+                            }
+                        },
+                        scales: {
+                            y: { min: -110, max: 110, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.5)' } },
+                            x: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: 'rgba(255,255,255,0.5)' } }
+                        },
+                        plugins: {
+                            zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } },
+                            legend: { display: false },
+                            tooltip: { enabled: true }
+                        }
+                    },
+                    plugins: [{ id: 'htmlAnnotations', afterDraw: () => updateAnnotations() }]
+                });
+            }
+
+            // Annotation Management (Draggable/Resizable)
+            const annotationsLayer = document.getElementById('annotations-layer');
+            function updateAnnotations() {
+                if (!chart || lifeEvents.length === 0) {
+                    annotationsLayer.innerHTML = '';
+                    return;
+                }
+                const meta = chart.getDatasetMeta(0);
+                const sortedData = [...lifeEvents].sort((a, b) => a.age - b.age);
+                const existingIds = new Set();
+
+                sortedData.forEach((data, index) => {
+                    const point = meta.data[index];
+                    if (!point) return;
+                    const elId = `bubble-${index}`;
+                    existingIds.add(elId);
+                    let bubble = document.getElementById(elId);
+
+                    if (!bubble) {
+                        bubble = document.createElement('div');
+                        bubble.id = elId;
+                        bubble.className = 'annotation-bubble';
+                        bubble.innerHTML = `<div class="font-bold text-xs text-center leading-tight mb-1">${data.event}</div><div class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 font-bold">${data.emotion >= 0 ? '+' : ''}${data.emotion}</div><div class="resize-handle absolute right-0 bottom-0 w-3 h-3 cursor-se-resize bg-gradient-to-br from-transparent to-white/20 rounded-br-[6px]"></div>`;
+                        annotationsLayer.appendChild(bubble);
+                    }
+
+                    bubble.className = `annotation-bubble ${data.emotion >= 0 ? 'text-green-300' : 'text-red-300'}`;
+                    bubble.setAttribute('data-feeling', data.feeling || '');
+                    
+                    // Default size if not specifically set
+                    const defaultW = 90;
+                    const defaultH = 50;
+                    bubble.style.width = (data.w || defaultW) + 'px';
+                    bubble.style.height = (data.h || defaultH) + 'px';
+
+                    const xOff = data.dx || 0;
+                    const yOff = data.dy || (data.emotion >= 0 ? -60 : 20);
+                    const bW = bubble.offsetWidth || 60;
+                    const transformX = point.x + xOff - bW/2;
+                    const transformY = point.y + yOff;
+
+                    bubble.style.transform = `translate(${transformX}px, ${transformY}px)`;
+                    bubble.setAttribute('data-x', transformX);
+                    bubble.setAttribute('data-y', transformY);
+                    bubble.setAttribute('data-index', index);
+                });
+
+                Array.from(annotationsLayer.children).forEach(child => { if (!existingIds.has(child.id)) child.remove(); });
+            }
+
+            interact('.annotation-bubble')
+                .draggable({
+                    listeners: {
+                        move(event) {
+                            const target = event.target;
+                            const idx = target.getAttribute('data-index');
+                            const sorted = [...lifeEvents].sort((a,b) => a.age-b.age);
+                            const original = lifeEvents.find(d => d.age === sorted[idx].age && d.event === sorted[idx].event);
+                            const meta = chart.getDatasetMeta(0);
+                            const point = meta.data[idx];
+
+                            const nx = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+                            const ny = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+                            target.style.transform = `translate(${nx}px, ${ny}px)`;
+                            target.setAttribute('data-x', nx);
+                            target.setAttribute('data-y', ny);
+
+                            original.dx = (nx + target.offsetWidth/2) - point.x;
+                            original.dy = ny - point.y;
+                        },
+                        end() { saveData(); }
+                    }
+                })
+                .resizable({
+                    edges: { right: '.resize-handle', bottom: '.resize-handle' },
+                    listeners: {
+                        move(event) {
+                            const target = event.target;
+                            target.style.width = event.rect.width + 'px';
+                            target.style.height = event.rect.height + 'px';
+                            const idx = target.getAttribute('data-index');
+                            const sorted = [...lifeEvents].sort((a,b) => a.age-b.age);
+                            const original = lifeEvents.find(d => d.age === sorted[idx].age && d.event === sorted[idx].event);
+                            original.w = event.rect.width;
+                            original.h = event.rect.height;
+                        },
+                        end() { saveData(); }
+                    }
+                });
+
+            // Academic Year Logic
+            function updateAcademicYear() {
+                const age = parseInt(ageInput.value);
+                if (isNaN(age)) { academicYearDisplay.textContent = ''; return; }
+                const career = careers.find(c => age >= c.start && age <= c.end);
+                if (career) {
+                    const year = age - career.start + 1;
+                    academicYearDisplay.textContent = career.name === '未就学児' ? '未就学児' : `${career.name} ${year}${career.name.match(/社会人|浪人/) ? '年目' : '年生'}`;
+                } else { academicYearDisplay.textContent = ''; }
+            }
+            ageInput.addEventListener('input', updateAcademicYear);
+
+            // Emotion Input Sync
+            emotionInput.addEventListener('input', (e) => { emotionNumber.value = e.target.value; });
+            emotionNumber.addEventListener('input', (e) => { 
+                let val = Math.max(-100, Math.min(100, parseInt(e.target.value) || 0));
+                emotionInput.value = val;
+            });
+
+            // Form Submit
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const data = {
+                    age: parseInt(ageInput.value),
+                    event: eventInput.value,
+                    emotion: parseInt(emotionInput.value),
+                    feeling: feelingInput.value
+                };
+                const editIdx = parseInt(editIndexInput.value);
+
+                if (editIdx > -1) {
+                    const old = lifeEvents[editIdx];
+                    lifeEvents[editIdx] = { ...data, dx: old.dx, dy: old.dy, w: old.w, h: old.h };
+                    editIndexInput.value = -1;
+                    addBtn.textContent = 'データを登録する';
+                    document.querySelector('.entry-form').classList.remove('edit-mode-active');
+                    cancelEditBtn.classList.add('hidden');
+                    document.querySelector('.edit-indicator').classList.add('hidden');
+                } else {
+                    lifeEvents.push(data);
+                }
+
+                saveData();
+                refreshAll();
+                form.reset();
+                emotionInput.value = 0; emotionNumber.value = 0;
+                academicYearDisplay.textContent = '';
+            });
+
+            function refreshAll() {
+                const sorted = [...lifeEvents].sort((a,b) => a.age-b.age);
+                chart.data.labels = sorted.map(d => d.age + '歳');
+                chart.data.datasets[0].data = sorted.map(d => d.emotion);
+                chart.update();
+                renderList();
+            }
+
+            function saveData() { localStorage.setItem('lifeEvents', JSON.stringify(lifeEvents)); }
+
+            function renderList() {
+                dataListBody.innerHTML = '';
+                lifeEvents.forEach((d, i) => {
+                    const row = document.createElement('tr');
+                    row.className = "border-b border-white/5 hover:bg-white/5 transition";
+                    row.innerHTML = `<td class="p-3">${d.age}</td><td class="p-3">${d.event}</td><td class="p-3 font-bold ${d.emotion >= 0 ? 'text-green-400' : 'text-red-400'}">${d.emotion}</td><td class="p-3 opacity-60 truncate max-w-[150px]">${d.feeling || ''}</td><td class="p-3 space-x-2"><button onclick="copyData(${i})" class="text-blue-400">複写</button><button onclick="editData(${i})" class="text-green-400">編集</button><button onclick="deleteData(${i})" class="text-red-400">削除</button></td>`;
+                    dataListBody.appendChild(row);
+                });
+            }
+
+            window.editData = (i) => {
+                const item = lifeEvents[i];
+                ageInput.value = item.age;
+                eventInput.value = item.event;
+                emotionInput.value = item.emotion;
+                emotionNumber.value = item.emotion;
+                feelingInput.value = item.feeling || '';
+                editIndexInput.value = i;
+                updateAcademicYear();
+                addBtn.textContent = '更新する';
+                document.querySelector('.entry-form').classList.add('edit-mode-active');
+                cancelEditBtn.classList.remove('hidden');
+                document.querySelector('.edit-indicator').classList.remove('hidden');
+                listModal.style.display = 'none';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            cancelEditBtn.addEventListener('click', () => {
+                editIndexInput.value = -1;
+                addBtn.textContent = 'データを登録する';
+                document.querySelector('.entry-form').classList.remove('edit-mode-active');
+                cancelEditBtn.classList.add('hidden');
+                document.querySelector('.edit-indicator').classList.add('hidden');
+                form.reset();
+            });
+
+            window.copyData = (i) => {
+                const d = lifeEvents[i];
+                const text = `年齢: ${d.age}歳\n出来事: ${d.event}\n感情: ${d.emotion}\n内容: ${d.feeling||''}`;
+                navigator.clipboard.writeText(text).then(() => showToast('項目をコピーしたよ！'));
+            };
+
+            window.deleteData = (i) => {
+                if (confirm('削除しますか？')) {
+                    lifeEvents.splice(i, 1);
+                    saveData(); refreshAll();
+                }
+            };
+
+            clearBtn.addEventListener('click', () => {
+                if(confirm('全て消去しますか？')) { lifeEvents = []; saveData(); refreshAll(); }
+            });
+
+            // Modal Controls
+            openListBtn.addEventListener('click', () => { renderList(); listModal.style.display = 'block'; });
+            closeListBtn.addEventListener('click', () => listModal.style.display = 'none');
+            copyAllBtn.addEventListener('click', () => {
+                let text = '年齢\t出来事\t感情\t気持ち\n' + lifeEvents.map(d => `${d.age}\t${d.event}\t${d.emotion}\t${d.feeling||''}`).join('\n');
+                navigator.clipboard.writeText(text).then(() => showToast('全データをコピーしたよ！'));
+            });
+
+            // Career Settings
+            function renderCareers() {
+                careerTimelineContainer.innerHTML = '';
+                careers.forEach((c, i) => {
+                    const row = document.createElement('div');
+                    row.className = 'career-row';
+                    row.draggable = true;
+                    row.innerHTML = `<div class="cursor-move opacity-30">≡</div><input type="number" class="w-12 bg-black/20 p-1 text-center rounded" value="${c.start}"> 〜 <input type="number" class="w-12 bg-black/20 p-1 text-center rounded" value="${c.end}"> <input type="text" class="flex-1 bg-black/20 p-1 rounded px-2" value="${c.name}"><button class="text-red-500 font-bold px-2">&times;</button>`;
+                    
+                    row.querySelector('button').onclick = () => { row.remove(); };
+                    row.addEventListener('dragstart', () => row.classList.add('dragging'));
+                    row.addEventListener('dragend', () => row.classList.remove('dragging'));
+                    careerTimelineContainer.appendChild(row);
+                });
+            }
+
+            careerTimelineContainer.addEventListener('dragover', e => {
+                e.preventDefault();
+                const draggingItem = document.querySelector('.dragging');
+                const afterElement = [...careerTimelineContainer.querySelectorAll('.career-row:not(.dragging)')].find(el => e.clientY < el.getBoundingClientRect().top + el.getBoundingClientRect().height/2);
+                if (afterElement) careerTimelineContainer.insertBefore(draggingItem, afterElement);
+                else careerTimelineContainer.appendChild(draggingItem);
+            });
+
+            openSettingsBtn.onclick = () => { renderCareers(); settingsModal.style.display = 'block'; };
+            closeSettingsBtn.onclick = () => settingsModal.style.display = 'none';
+            addCareerBtn.onclick = () => {
+                 const row = document.createElement('div');
+                 row.className = 'career-row'; row.draggable = true;
+                 row.innerHTML = `<div class="cursor-move opacity-30">≡</div><input type="number" class="w-12 bg-black/20 p-1 text-center rounded" value="0"> 〜 <input type="number" class="w-12 bg-black/20 p-1 text-center rounded" value="0"> <input type="text" class="flex-1 bg-black/20 p-1 rounded px-2" value=""><button class="text-red-500 font-bold px-2">&times;</button>`;
+                 row.querySelector('button').onclick = () => row.remove();
+                 row.addEventListener('dragstart', () => row.classList.add('dragging'));
+                 row.addEventListener('dragend', () => row.classList.remove('dragging'));
+                 careerTimelineContainer.appendChild(row);
+            };
+
+            saveSettingsBtn.onclick = () => {
+                const rows = [...careerTimelineContainer.querySelectorAll('.career-row')];
+                const nextCareers = rows.map(r => {
+                    const inputs = r.querySelectorAll('input');
+                    return { start: parseInt(inputs[0].value), end: parseInt(inputs[1].value), name: inputs[2].value };
+                });
+                
+                // Overlap Check
+                let err = false;
+                for(let i=0; i<nextCareers.length; i++) {
+                    for(let j=i+1; j<nextCareers.length; j++) {
+                        if (Math.max(nextCareers[i].start, nextCareers[j].start) <= Math.min(nextCareers[i].end, nextCareers[j].end)) err = true;
+                    }
+                }
+                if(err) { showToast('年齢の範囲に重複があるよ！', 'error'); return; }
+                
+                careers = nextCareers;
+                localStorage.setItem('userCareers', JSON.stringify(careers));
+                settingsModal.style.display = 'none';
+                updateAcademicYear();
+            };
+
+            // AI Analysis Logic
+            apiKeyInput.addEventListener('input', (e) => { geminiApiKey = e.target.value; });
+
+            analyzeBtn.addEventListener('click', async () => {
+                if (!geminiApiKey) { showToast('Gemini API Keyを入力してね。', 'error'); return; }
+                if (lifeEvents.length === 0) { showToast('データがないみたい。まずは出来事を登録しよう！', 'info'); return; }
+
+                analyzeBtn.disabled = true;
+                aiLoading.style.display = 'flex';
+                aiResultPanel.classList.add('hidden');
+                
+                const prompt = `あなたは鋭い洞察力を持つカウンセラーです。以下の人生データから、ユーザー自身も気づいていないような『潜在的な価値観』『感情が動く真の理由』『思考のパターン』を分析し、200〜300文字程度の簡潔なレポート形式（Markdown）で出力してください。アドバイスや適職診断は不要です。分析に徹してください。\n\nデータ内容:\n${JSON.stringify(lifeEvents, null, 2)}`;
+
+                try {
+                    // v1beta エンドポイントを使用
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiApiKey}`;
+                    const requestBody = {
+                        contents: [{ parts: [{ text: prompt }] }]
+                    };
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        const status = response.status;
+                        const message = result.error ? result.error.message : '取得失敗';
+                        
+                        let customMsg = `[APIエラー ${status}] ${message}`;
+                        showToast(customMsg, 'error');
+                        throw new Error(customMsg);
+                    }
+
+                    if (result.candidates && result.candidates[0].content.parts[0].text) {
+                        const reportText = result.candidates[0].content.parts[0].text;
+                        aiResultPanel.innerHTML = marked.parse(reportText);
+                        aiResultPanel.classList.remove('hidden');
+                    } else {
+                        throw new Error('分析結果の構造が正しくありません。');
+                    }
+                } catch (error) {
+                    console.error('Final Catch:', error);
+                    if (!error.message.includes('APIエラー')) {
+                        showToast('エラーが発生しちゃった: ' + error.message, 'error');
+                    }
+                } finally {
+                    analyzeBtn.disabled = false;
+                    aiLoading.style.display = 'none';
+                }
+            });
+
+            // Initialize
+            initChart();
+            renderList();
+        });
+    </script>
+</body>
+</html>
